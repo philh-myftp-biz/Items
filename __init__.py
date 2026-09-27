@@ -1,59 +1,53 @@
-from philh_myftp_biz.process import RunHidden
-from philh_myftp_biz.modules import Repo
+from .. import install # Run install.py
+
+from philh_myftp_biz.pc import NAME, Path
 from philh_myftp_biz.terminal import Log
-from philh_myftp_biz.web import URL
-from philh_myftp_biz.pc import NAME
-from warnings import filterwarnings
-from .run.Api import get_data
-from typing import Literal
-from subprocess import run
-from sys import executable
-from . import Items
+from importlib import import_module
+from typing import TYPE_CHECKING
 
-filterwarnings("ignore", category=RuntimeWarning, message=".*found in sys.modules.*")
+from philh_myftp_biz.pc.hardware import HardDrive, PCIeCard, VirtualDisk
+from philh_myftp_biz.modules import Module, Service
+if TYPE_CHECKING: from ._py import Tower
 
-IS_SERVER: bool = (NAME == 'PC-1')
+VirtualDisks: list[VirtualDisk]
+HardDrives: list[HardDrive]
+PCIeCards: list[PCIeCard]
+Services: list[Service]
+Modules: list[Module]
+Towers: list['Tower']
 
-try:
-    main_repo = Repo('E:/')
-except FileNotFoundError:
-    main_repo = None
+_cache = {}
 
-def pip(*args) -> None:
-    run([executable, '-m', 'pip', *args])
+def __getattr__(name:str):
 
-def shutdown(
-    mode: Literal['s', 'r'],
-    t: int = 30
-) -> None:
+    if name in _cache:
+        return _cache[name]
 
-    # Show Prompt to abort shutdown
-    Items.Modules[0].start('vbs/abort')
+    Log.VERB(f'Collecting Items: {name}')
 
-    # Restart the Server
-    RunHidden(
-        'shutdown',
-        f'/{mode}',
-        '/t', t
-    )
+    try:
+        items: list = import_module(
+            name = f'.{NAME.replace('-', '')}.{name}', 
+            package = __name__
+        ).Items.copy()
+    except ModuleNotFoundError:
+        items = []
 
-_alert_url = URL("https://script.google.com/macros/s/AKfycbxLMSyiCEk5D2l7UmPUAzLVJ1BbGoRryuoiP718py2xJDD2fSM1GW4GDhuYqdHVH_EbtQ/exec")
+    match name:
 
-def alert(msg:str) -> None:
+        case 'HardDrives':
+            items += filter(
+                lambda d: not any(i.SN==d.SN for i in items),
+                HardDrive.search()
+            )
 
-    Log.MAIN(msg)
+        case 'Services':
+            _dir = Path('C:/Scripts/Services/')
+            items += [Service(d) for d in _dir.children if d.is_dir and d.name[0]!='_']
 
-    # Show Alert Box
-    Items.Modules[0].start('vbs/alert', msg)
+        case 'Modules':
+            items.insert(0, Module('C:/Scripts/'))
 
-    if IS_SERVER:
-        _alert_url.copy(body = {
-            'message': msg,
-            'doAlert': False,
-            'items': get_data(
-                *Items.VirtualDisks,
-                *Items.HardDrives,
-                *Items.PCIeCards,
-            ),
-        }).post()
+    _cache[name] = items
+    return items
 
