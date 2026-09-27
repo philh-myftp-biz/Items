@@ -1,4 +1,4 @@
-from philh_myftp_biz.modules import Service
+from .. import Service
 
 Items = [
 

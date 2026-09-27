@@ -1,4 +1,4 @@
-from philh_myftp_biz.pc.hardware import PCIeCard
+from .. import PCIeCard
 
 Items = [
 

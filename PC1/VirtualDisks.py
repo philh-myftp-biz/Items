@@ -1,4 +1,4 @@
-from philh_myftp_biz.pc.hardware import VirtualDisk
+from .. import VirtualDisk
 
 Items: list[VirtualDisk] = [
 
